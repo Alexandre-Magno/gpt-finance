@@ -1,6 +1,9 @@
 import type { Config } from "tailwindcss";
 import { fontFamily } from "tailwindcss/defaultTheme";
 
+// Channel-only vars so opacity modifiers (bg-primary/10) actually work.
+const token = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 export default {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -10,23 +13,35 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        primary: "var(--primary)",
-        "primary-foreground": "var(--primary-foreground)",
-        secondary: "var(--secondary)",
-        "secondary-foreground": "var(--secondary-foreground)",
-        muted: "var(--muted)",
-        "muted-foreground": "var(--muted-foreground)",
-        accent: "var(--accent)",
-        "accent-foreground": "var(--accent-foreground)",
-        card: "var(--card)",
-        "card-foreground": "var(--card-foreground)",
-        border: "var(--border)",
+        background: token("background"),
+        foreground: token("foreground"),
+        surface: token("surface"),
+        muted: token("muted"),
+        "muted-foreground": token("muted-foreground"),
+        border: token("border"),
+        primary: token("primary"),
+        "primary-foreground": token("primary-foreground"),
+        positive: token("positive"),
+        negative: token("negative"),
+        warning: token("warning"),
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", ...fontFamily.sans],
         mono: ["var(--font-geist-mono)", ...fontFamily.mono],
+      },
+      keyframes: {
+        enter: {
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to: { opacity: "1", transform: "none" },
+        },
+        blink: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0" },
+        },
+      },
+      animation: {
+        enter: "enter 240ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        blink: "blink 1s step-end infinite",
       },
     },
   },

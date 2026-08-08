@@ -1,0 +1,12 @@
+[Unit]
+Description=Verifica a cada 2 min se ha nova versao do gpt-finance na main
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+# nao acumula execucoes se a VM ficar suspensa
+AccuracySec=15s
+Unit=gptfin-deploy.service
+
+[Install]
+WantedBy=timers.target

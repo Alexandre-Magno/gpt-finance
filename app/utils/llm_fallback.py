@@ -11,7 +11,7 @@ imediatamente: repetir num modelo diferente daria o mesmo resultado.
 """
 
 import logging
-from typing import Awaitable, Callable, Optional, Sequence, TypeVar
+from typing import Awaitable, Callable, Iterator, Optional, Sequence, TypeVar
 
 from groq import APIStatusError, NotFoundError, RateLimitError
 
@@ -30,14 +30,45 @@ _MODEL_LEVEL_CODES = frozenset(
 )
 
 
+def _unwrap(exc: BaseException) -> Iterator[BaseException]:
+    """Percorre a cadeia de excecoes ate o erro original da API.
+
+    O `instructor` nao deixa o erro da Groq subir cru: ele embrulha em
+    InstructorRetryException, cujo __cause__ e um RetryError do tenacity, que
+    por sua vez guarda a excecao real na ultima tentativa. Olhar so o topo da
+    pilha faz o fallback nunca reconhecer um rate limit.
+    """
+    seen: set = set()
+    pending = [exc]
+    while pending:
+        current = pending.pop()
+        if current is None or id(current) in seen:
+            continue
+        seen.add(id(current))
+        yield current
+
+        # tenacity: a excecao real fica na ultima tentativa
+        last_attempt = getattr(current, "last_attempt", None)
+        if last_attempt is not None:
+            try:
+                pending.append(last_attempt.exception())
+            except Exception:  # pragma: no cover - tentativa sem excecao
+                pass
+
+        pending.append(getattr(current, "__cause__", None))
+        pending.append(getattr(current, "__context__", None))
+
+
 def is_model_level_failure(exc: BaseException) -> bool:
     """True quando outro modelo tem chance real de atender a mesma request."""
-    if isinstance(exc, (RateLimitError, NotFoundError)):
-        return True
-    if isinstance(exc, APIStatusError):
-        body = exc.body if isinstance(exc.body, dict) else {}
-        error = body.get("error") if isinstance(body.get("error"), dict) else {}
-        return error.get("code") in _MODEL_LEVEL_CODES
+    for candidate in _unwrap(exc):
+        if isinstance(candidate, (RateLimitError, NotFoundError)):
+            return True
+        if isinstance(candidate, APIStatusError):
+            body = candidate.body if isinstance(candidate.body, dict) else {}
+            error = body.get("error") if isinstance(body.get("error"), dict) else {}
+            if error.get("code") in _MODEL_LEVEL_CODES:
+                return True
     return False
 
 

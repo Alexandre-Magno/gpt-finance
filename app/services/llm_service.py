@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 class LLMService:
     def __init__(self, settings: Settings):
-        self.client = AsyncGroq(api_key=settings.llm_api_key)  # Changed to AsyncGroq
+        self.client = AsyncGroq(
+            api_key=settings.llm_api_key, max_retries=settings.llm_max_retries
+        )
         self.default_models = settings.llm_model_chain
         self.default_temperature = settings.llm_temperature
         self.default_max_output_tokens = settings.llm_max_output_tokens

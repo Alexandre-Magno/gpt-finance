@@ -50,6 +50,9 @@ yarn-error.log*
 .env*
 !.env-example
 
+# tag da imagem em producao, escrita pelo deploy na VM
+.deploy-tag
+
 # vercel
 .vercel
 

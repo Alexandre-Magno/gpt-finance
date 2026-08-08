@@ -1,0 +1,78 @@
+# Stack de producao. Usa imagens ja construidas e publicadas no GHCR pelo
+# workflow .github/workflows/deploy.yml -- nada e buildado na VM.
+#
+#   IMAGE_TAG=sha-abc1234 docker compose -f docker-compose.prod.yml up -d
+#
+# Portas ficam presas em 127.0.0.1: o acesso publico entra pelo nginx do host
+# (gptfin.alexandre-magno.com -> 127.0.0.1:3010).
+name: gptfin
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.14.1
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - app-network
+    # Sem `ports`: o Qdrant sobe sem API key e a VM nao tem firewall ativo,
+    # entao ele so pode ser alcancado de dentro da rede do compose.
+
+  # Cria a collection com os 3 tipos de vetor. Idempotente: se ja existe, nao faz nada.
+  init-collection:
+    image: ghcr.io/alexandre-magno/gpt-finance-backend:${IMAGE_TAG:-latest}
+    command: python ingestion/create-collection.py
+    env_file:
+      - .env
+    environment:
+      # precedem o .env: dentro da stack o Qdrant e alcancado pelo nome do servico
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=
+    depends_on:
+      - qdrant
+    # ponytail: retry no lugar de healthcheck, o Qdrant sobe em ~2s
+    restart: on-failure:5
+    networks:
+      - app-network
+
+  backend:
+    image: ghcr.io/alexandre-magno/gpt-finance-backend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8010:8000"
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=production
+      # os modelos ja vem baixados na imagem (/tmp/vector), sem download em runtime
+      - EMBEDDER_LOCAL_FILES_ONLY=true
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=
+    depends_on:
+      init-collection:
+        condition: service_completed_successfully
+    mem_limit: 2g
+    networks:
+      - app-network
+
+  frontend:
+    image: ghcr.io/alexandre-magno/gpt-finance-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3010:3000"
+    environment:
+      # destino dos rewrites de /api/* feitos server-side pelo Next
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    mem_limit: 512m
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  qdrant_data:

@@ -241,9 +241,20 @@ def process_and_ingest_news(ticker: str, max_stories: int = 10):
         return False
 
 
-# Configuration and execution
-ticker = "AAPL"
-max_stories = 10
+def main():
+    import argparse
+    import sys
 
-# Run the pipeline
-process_and_ingest_news(ticker=ticker, max_stories=max_stories)
+    parser = argparse.ArgumentParser(
+        description="Ingere noticias recentes de um ticker no Qdrant."
+    )
+    parser.add_argument("--ticker", default="AAPL")
+    parser.add_argument("--max-stories", type=int, default=10)
+    args = parser.parse_args()
+
+    ok = process_and_ingest_news(ticker=args.ticker, max_stories=args.max_stories)
+    sys.exit(0 if ok else 1)
+
+
+if __name__ == "__main__":
+    main()

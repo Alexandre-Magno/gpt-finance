@@ -53,8 +53,9 @@ class LLMService:
 
         except Exception as e:
             logger.error(
-                "LLM response generation failed",
-                extra={"error": str(e), "query": query},
+                "LLM response generation failed: %s",
+                e,
+                extra={"query": query},
             )
             raise Exception(f"Failed to generate response: {str(e)}")
 
@@ -104,8 +105,9 @@ class LLMService:
 
         except Exception as e:
             logger.error(
-                "LLM stream response generation failed",
-                extra={"error": str(e), "query": query},
+                "LLM stream response generation failed: %s",
+                e,
+                extra={"query": query},
             )
             yield json.dumps(
                 {

@@ -1,14 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    const isProd = process.env.NODE_ENV === 'production';
     const isDocker = process.env.DOCKER_ENV === 'true';
 
-    const backendUrl = isProd
-      ? 'http://31.220.104.116:8000'
-      : isDocker
-        ? 'http://backend:8000'
-        : 'http://127.0.0.1:8000';
+    // Em producao o compose injeta BACKEND_URL apontando para o servico
+    // interno (http://backend:8000). Os fallbacks cobrem dev local.
+    const backendUrl =
+      process.env.BACKEND_URL ||
+      (isDocker ? 'http://backend:8000' : 'http://127.0.0.1:8000');
 
     return [
       {

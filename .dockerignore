@@ -1,0 +1,36 @@
+# Contexto de build do backend (app/Dockerfile). O frontend tem o seu proprio
+# contexto em ./front, entao nada dele precisa entrar aqui.
+
+.git
+.github
+.gitignore
+
+# segredos: nunca vao para dentro da imagem, que e publicada no GHCR
+.env
+.env.*
+!.env-example
+
+# frontend
+front/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# local
+experiments/
+instance/
+*.swp
+.DS_Store
+README.md
+LICENSE
+docker-compose.yml
+docker-compose.prod.yml

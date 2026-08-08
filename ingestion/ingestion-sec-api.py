@@ -31,6 +31,8 @@ EMBED_MODEL_ID = "sentence-transformers/all-MiniLM-L6-v2"
 SPARSE_MODEL_ID = "Qdrant/bm25"
 COLBERT_MODEL_ID = "colbert-ir/colbertv2.0"
 MAX_TOKENS = 384
+# Abaixo disso o HDBSCAN nao tem pontos suficientes para agrupar.
+MIN_PARAGRAPHS_FOR_CLUSTERING = 6
 
 
 @dataclass
@@ -143,6 +145,27 @@ def fetch_sec_filing_text(
         return None
 
 
+def _chunk_by_tokens(paragraphs, max_tokens: int):
+    """Agrupa paragrafos ate o limite de tokens, sem clustering."""
+    tokenizer = tiktoken.encoding_for_model("gpt-4o")
+    chunks = []
+    current, current_tokens = [], 0
+
+    for para in paragraphs:
+        para_tokens = len(tokenizer.encode(para))
+        if current_tokens + para_tokens > max_tokens and current:
+            chunks.append({"text": "\n\n".join(current)})
+            current, current_tokens = [para], para_tokens
+        else:
+            current.append(para)
+            current_tokens += para_tokens
+
+    if current:
+        chunks.append({"text": "\n\n".join(current)})
+
+    return chunks
+
+
 def create_semantic_chunks(text_content: str, max_tokens: int = 384):
     """
     Create semantic chunks using clustering approach.
@@ -152,13 +175,33 @@ def create_semantic_chunks(text_content: str, max_tokens: int = 384):
         p.strip() for p in text_content.split("\n") if len(p.strip().split()) > 10
     ]
 
+    if not paragraphs:
+        print("Nenhum paragrafo com conteudo suficiente para chunking")
+        return []
+
+    # O HDBSCAN precisa de mais pontos do que o min_cluster_size, senao estoura
+    # com "k must be less than or equal to the number of training points". Isso
+    # acontece de verdade em secoes tabulares (Financial Statements), onde o
+    # filtro de 10 palavras acima descarta quase todas as linhas.
+    if len(paragraphs) < MIN_PARAGRAPHS_FOR_CLUSTERING:
+        print(
+            f"Apenas {len(paragraphs)} paragrafos: usando chunking por tokens "
+            "em vez de clustering semantico"
+        )
+        return _chunk_by_tokens(paragraphs, max_tokens)
+
     # Gera embeddings para clustering
     model = SentenceTransformer("all-MiniLM-L6-v2")
     embeddings = model.encode(paragraphs)
 
     # Clustering principal
     clusterer = hdbscan.HDBSCAN(min_cluster_size=3, metric="euclidean")
-    labels = clusterer.fit_predict(embeddings)
+    try:
+        labels = clusterer.fit_predict(embeddings)
+    except ValueError as e:
+        # rede de seguranca: nenhum texto vale perder por causa do clustering
+        print(f"Clustering falhou ({e}); usando chunking por tokens")
+        return _chunk_by_tokens(paragraphs, max_tokens)
 
     # Agrupa clusters principais
     from collections import defaultdict

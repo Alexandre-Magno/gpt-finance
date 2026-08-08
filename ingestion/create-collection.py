@@ -1,4 +1,5 @@
 import os
+import sys
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import VectorParams, Distance
@@ -7,18 +8,22 @@ from qdrant_client.http.models import VectorParams, Distance
 load_dotenv()
 
 # Configurações da collection
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "portiq")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "documents")
+RECREATE = "--recreate" in sys.argv
 
 # Inicializa o cliente Qdrant
 client = QdrantClient(
     url=os.getenv("QDRANT_URL"),
-    api_key=os.getenv("QDRANT_API_KEY"),
+    api_key=os.getenv("QDRANT_API_KEY") or None,
 )
 
-# Verifica se a collection já existe e remove se necessário
+# Idempotente: só recria se pedido explicitamente com --recreate
 collections = client.get_collections().collections
 collection_names = [collection.name for collection in collections]
 if COLLECTION_NAME in collection_names:
+    if not RECREATE:
+        print(f"Collection '{COLLECTION_NAME}' já existe. Use --recreate para apagar e recriar.")
+        sys.exit(0)
     print(f"Collection '{COLLECTION_NAME}' já existe. Removendo...")
     client.delete_collection(COLLECTION_NAME)
 

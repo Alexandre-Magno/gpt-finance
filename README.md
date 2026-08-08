@@ -135,7 +135,17 @@ cp .env-example .env
 
 2. Edit the `.env` file with your API keys and configuration
 
-3. Ensure your Qdrant vector database is running and populated with financial documents
+3. Start Qdrant. `docker-compose` already ships one (service `qdrant`, data persisted in the `qdrant_data` volume) and creates the collection automatically via the `init-collection` service. To run it standalone:
+```bash
+docker run -p 6333:6333 -v qdrant_data:/qdrant/storage qdrant/qdrant
+python ingestion/create-collection.py           # idempotent; --recreate wipes and rebuilds
+```
+
+4. Populate it with financial documents:
+```bash
+python ingestion/ingestion-sec-api.py          # 10-K / 10-Q filings (needs SEC_API_KEY)
+python ingestion/ingestion-yfinance-news.py    # recent news
+```
 
 ### Running with Docker (Recommended)
 Prerequisites for Docker:
@@ -157,8 +167,12 @@ docker-compose up --build
 ```
 This will start:
 
+- Qdrant: http://localhost:6333 (dashboard at /dashboard), data persisted in the `qdrant_data` volume
+- `init-collection`: one-shot job that creates the collection if it doesn't exist, then exits
 - Backend API: http://localhost:8000 with interactive docs at /docs
 - Frontend Interface: http://localhost:3000
+
+The stack is self-contained — no external Qdrant needed. Only the LLM (Groq) and the ingestion sources (`SEC_API_KEY`) still require external keys. To wipe the vector data: `docker-compose down -v`.
 
 ### Running the API
 ```bash

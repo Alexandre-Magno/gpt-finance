@@ -1,4 +1,32 @@
 services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - app-network
+
+  # Cria a collection com os 3 tipos de vetor. Idempotente: se ja existe, nao faz nada.
+  init-collection:
+    build:
+      context: .
+      dockerfile: ./app/Dockerfile
+    command: python ingestion/create-collection.py
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=
+    volumes:
+      - .:/app
+    depends_on:
+      - qdrant
+    # ponytail: retry no lugar de healthcheck, o Qdrant sobe em ~2s
+    restart: on-failure:5
+    networks:
+      - app-network
+
   backend:
     build:
       context: .
@@ -8,9 +36,13 @@ services:
     environment:
       - ENVIRONMENT=development
       - EMBEDDER_LOCAL_FILES_ONLY=false
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=
     volumes:
       - .:/app
       - model_cache:/tmp/vector
+    depends_on:
+      - qdrant
     networks:
       - app-network
 
@@ -37,3 +69,4 @@ networks:
 
 volumes:
   model_cache:
+  qdrant_data:

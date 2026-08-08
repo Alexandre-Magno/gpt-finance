@@ -25,12 +25,21 @@ const nextConfig = {
     ];
   },
 
+  // O uvicorn fecha conexao ociosa em 5s (timeout_keep_alive padrao) e o
+  // Node guarda o socket no pool por bem mais tempo: a request seguinte
+  // reaproveitava um socket ja morto e virava ECONNRESET ("socket hang up"),
+  // um 500 em menos de 1s logo apos uma analise longa. Sem controle sobre o
+  // freeSocketTimeout do agent, desligar keep-alive e o que elimina a corrida
+  // -- o handshake TCP na rede interna do compose e irrelevante perto dos
+  // ~80s de uma analise.
   httpAgentOptions: {
-    keepAlive: true,
+    keepAlive: false,
   },
 
   experimental: {
-    proxyTimeout: 120_000, // 120 seconds
+    // Uma analise completa sao 4 chamadas ao LLM em sequencia e leva ~80-100s;
+    // com fallback de modelo passa disso. 120s cortava respostas validas.
+    proxyTimeout: 300_000, // 5 minutos
   },
 };
 

@@ -86,12 +86,44 @@ Qdrant:
 
 ```bash
 uv venv .venv && uv pip install -r requirements.txt --python .venv/bin/python
-.venv/bin/python ingestion/ingestion-yfinance-news.py
-.venv/bin/python ingestion/ingestion-sec-api.py
 ```
 
-Ambos são hardcoded para `AAPL`. O `init-collection` do compose só cria a
-collection vazia — sem ingestão, o RAG responde sem fontes.
+**Os três streams de análise leem formulários diferentes** — veja
+`app/config/queries.yaml`. Ingerir só um formulário faz o stream
+correspondente retornar vazio (a análise fundamental graduava tudo como `D`
+enquanto não havia nenhum 10-K na collection):
+
+| Stream | Formulário | Seções a ingerir |
+|---|---|---|
+| fundamental | 10-K | `1A` (Risk Factors), `1` (Business), `7` (MD&A), `8` (Financial Statements) |
+| momentum | 10-Q | `part2item1a` (Risk Factors), `part1item2` (MD&A), `part1item1` (Financial) |
+| sentiment | notícias | — |
+
+Conjunto completo para um ticker (~4 min no total):
+
+```bash
+for s in 1A 1 7 8; do
+  .venv/bin/python ingestion/ingestion-sec-api.py --ticker AAPL --form-type 10-K --section "$s"
+done
+for s in part2item1a part1item2 part1item1; do
+  .venv/bin/python ingestion/ingestion-sec-api.py --ticker AAPL --form-type 10-Q --section "$s"
+done
+.venv/bin/python ingestion/ingestion-yfinance-news.py --ticker AAPL --max-stories 20
+```
+
+O `init-collection` do compose só cria a collection vazia — sem ingestão, o RAG
+responde sem fontes. Para conferir o que já existe:
+
+```bash
+curl -s -X POST http://127.0.0.1:6333/collections/documents/points/count \
+  -H 'Content-Type: application/json' \
+  -d '{"filter":{"must":[{"key":"metadata.formType","match":{"value":"10-K"}}]},"exact":true}'
+```
+
+> O timer de deploy faz `git reset --hard` em `/root/gpt-finance`. Se for
+> trabalhar no repo direto na VM, pare o timer antes
+> (`systemctl stop gptfin-deploy.timer`) para não perder alterações não
+> commitadas.
 
 ## Modelo do LLM
 

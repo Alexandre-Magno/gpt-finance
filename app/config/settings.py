@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # Groq e por modelo e por dia, entao o fallback tem cota propria; tambem
     # cobre o caso de um modelo ser descomissionado.
     llm_fallback_models: str = "llama-3.1-8b-instant,openai/gpt-oss-20b"
+    # O SDK da Groq tenta 2 vezes por padrao. Em rate limit diario isso e
+    # tempo jogado fora -- a cota so volta no dia seguinte, e quem resolve e
+    # o fallback. Mantido baixo para o fallback entrar rapido.
+    llm_max_retries: int = 1
     llm_temperature: float = 0.0
     llm_max_output_tokens: int = 4096
 

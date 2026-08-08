@@ -27,9 +27,10 @@ class TickerExtractor:
         config_loader,
         temperature: float = 0.0,
         max_tokens: int = 50,  # Increased for reasoning
+        max_retries: int = 1,
     ):
         # Initialize client and patch with Instructor
-        base_client = AsyncGroq(api_key=llm_api_key)
+        base_client = AsyncGroq(api_key=llm_api_key, max_retries=max_retries)
         self.client = instructor.from_groq(base_client)
         self.models = models
         self.prompt_manager = prompt_manager

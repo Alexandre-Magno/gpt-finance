@@ -42,7 +42,9 @@ class AgentService:
         self, embedder: QueryEmbedder, retriever: QdrantRetriever, settings: Settings
     ):
         # Initialize LLM client and patch with Instructor
-        base_client = AsyncGroq(api_key=settings.llm_api_key)
+        base_client = AsyncGroq(
+            api_key=settings.llm_api_key, max_retries=settings.llm_max_retries
+        )
         self.client = instructor.from_groq(base_client)
         self.models = settings.llm_model_chain
 
@@ -59,6 +61,7 @@ class AgentService:
         self.ticker_extractor = TickerExtractor(
             llm_api_key=settings.llm_api_key,
             models=self.models,
+            max_retries=settings.llm_max_retries,
             prompt_manager=self.prompt_manager,
             config_loader=self.config_loader,
             temperature=settings.ticker_extraction_temperature,

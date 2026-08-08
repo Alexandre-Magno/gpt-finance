@@ -9,9 +9,11 @@ bastava usar outro modelo.
 import httpx
 import pytest
 from groq import AuthenticationError, BadRequestError, RateLimitError
+from instructor.exceptions import InstructorRetryException
+from tenacity import RetryError
 
 from app.config.settings import Settings
-from app.utils.llm_fallback import call_with_model_fallback
+from app.utils.llm_fallback import call_with_model_fallback, is_model_level_failure
 
 CHAIN = ["primario", "fallback1", "fallback2"]
 
@@ -81,6 +83,41 @@ async def test_primario_respondendo_nao_toca_nos_fallbacks():
 
     assert await call_with_model_fallback(CHAIN, call) == "ok:primario"
     assert chamados == ["primario"]
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_embrulhado_pelo_instructor_ainda_e_reconhecido():
+    """O instructor nao deixa o erro da Groq subir cru.
+
+    Ele levanta InstructorRetryException com __cause__ apontando para um
+    RetryError do tenacity, que guarda a excecao real na ultima tentativa.
+    Olhar so o topo da pilha fazia o fallback ignorar o rate limit e devolver
+    500 mesmo havendo modelo com cota.
+    """
+    original = make_error(RateLimitError, "rate_limit_exceeded", 429)
+
+    class FakeAttempt:
+        def exception(self):
+            return original
+
+    retry_error = RetryError(FakeAttempt())
+    embrulhado = InstructorRetryException(
+        "falhou apos as tentativas", n_attempts=1, total_usage=0
+    )
+    embrulhado.__cause__ = retry_error
+
+    assert is_model_level_failure(embrulhado)
+
+    chamados = []
+
+    async def call(model):
+        chamados.append(model)
+        if model == "primario":
+            raise embrulhado
+        return f"ok:{model}"
+
+    assert await call_with_model_fallback(CHAIN, call) == "ok:fallback1"
+    assert chamados == ["primario", "fallback1"]
 
 
 @pytest.mark.asyncio

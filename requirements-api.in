@@ -1,0 +1,14 @@
+# Dependencias do container da API (app/). O backend usa fastembed (onnxruntime),
+# nao torch: manter esta lista enxuta corta ~2.5GB do build.
+# Ingestao (torch, sec-api, hdbscan) fica em requirements.in, rodada no host.
+fastapi
+uvicorn
+python-multipart
+pydantic
+pydantic-settings
+pyyaml
+python-dotenv
+groq
+instructor[groq]
+qdrant-client
+fastembed

@@ -1,0 +1,13 @@
+[Unit]
+Description=Deploy do gpt-finance (pull a partir da main)
+Documentation=https://github.com/Alexandre-Magno/gpt-finance
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/gptfin-deploy
+WorkingDirectory=/root/gpt-finance
+# o build da imagem pode acabar de sair; o health check espera ate 5 min
+TimeoutStartSec=20min

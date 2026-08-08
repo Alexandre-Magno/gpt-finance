@@ -1,14 +1,8 @@
-'use client';
-
-import { useState } from 'react';
-import { LineChart, Upload } from 'lucide-react';
+import { LineChart } from 'lucide-react';
 import { Container } from '@/components/container';
 import { StreamingChat } from '@/components/streaming-chat';
-import { UploadModal } from '@/components/upload-modal';
 
 export default function Home() {
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-
   return (
     <div className="flex min-h-dvh flex-col">
       <a
@@ -19,24 +13,13 @@ export default function Home() {
       </a>
 
       <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
-        <Container className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
-              <LineChart className="h-4 w-4" />
-            </span>
-            <span className="text-[15px] font-semibold tracking-tight text-foreground">
-              gpt-finance
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsUploadModalOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-border px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">Add document</span>
-            <span className="sr-only sm:hidden">Add document</span>
-          </button>
+        <Container className="flex h-16 items-center gap-2.5">
+          <span className="grid h-8 w-8 place-items-center rounded-md bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
+            <LineChart className="h-4 w-4" />
+          </span>
+          <span className="text-[15px] font-semibold tracking-tight text-foreground">
+            gpt-finance
+          </span>
         </Container>
       </header>
 
@@ -61,8 +44,6 @@ export default function Home() {
           <p>Generated analysis — not investment advice.</p>
         </Container>
       </footer>
-
-      <UploadModal isOpen={isUploadModalOpen} onClose={() => setIsUploadModalOpen(false)} />
     </div>
   );
 }

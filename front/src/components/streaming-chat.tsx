@@ -13,7 +13,7 @@ const MODES = [
     id: 'research' as const,
     label: 'Research',
     icon: Search,
-    hint: 'Streams a grounded answer from indexed filings, news and your uploads.',
+    hint: 'Streams an answer grounded in the indexed filings and news.',
     placeholder: 'Ask about a company, a filing, or a market trend...',
     examples: ['Main risks in the latest Apple 10-K', 'How is NVDA revenue trending?'],
   },

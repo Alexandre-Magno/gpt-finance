@@ -2,8 +2,8 @@ company_ticker_mappings:
   # Tech companies
   apple: AAPL
   microsoft: MSFT
-  google: GOOGL
-  alphabet: GOOGL
+  google: GOOG
+  alphabet: GOOG
   amazon: AMZN
   tesla: TSLA
   meta: META

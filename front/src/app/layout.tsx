@@ -1,17 +1,21 @@
-import type { Metadata } from "next";
-// Corrected imports for Geist and Geist Mono
-import { GeistSans } from "geist/font/sans"; // Import from 'geist/font/sans'
-import { GeistMono } from "geist/font/mono"; // Import from 'geist/font/mono'
+import type { Metadata, Viewport } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
-// You no longer need to call Geist or Geist_Mono as functions
-// Just assign the imported font objects directly
-const geistSans = GeistSans;
-const geistMono = GeistMono;
-
 export const metadata: Metadata = {
-  title: "gpt-finance - Investment Intelligence",
-  description: "Multi-stream investment analysis using RAG to analyze stocks through fundamental, momentum, and sentiment analysis",
+  title: "gpt-finance — equity research",
+  description:
+    "Multi-stream investment analysis using RAG to analyze stocks through fundamental, momentum, and sentiment analysis",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#020617" },
+  ],
 };
 
 export default function RootLayout({
@@ -20,12 +24,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }

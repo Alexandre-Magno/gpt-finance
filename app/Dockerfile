@@ -1,18 +1,17 @@
 # Dockerfile for Backend (FastAPI)
 FROM python:3.13-slim
 
+# uv no lugar do pip: resolve e instala em segundos
+COPY --from=ghcr.io/astral-sh/uv:0.12.3 /uv /bin/uv
+ENV UV_LINK_MODE=copy
+
 WORKDIR /app
 
-# Install system dependencies if needed
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements file
-COPY requirements.txt .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Só as deps que app/ importa. A ingestão (torch, sec-api, hdbscan) usa
+# requirements.txt e roda no host — instalá-la aqui somaria ~2.5GB ao build.
+COPY requirements-api.txt .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -r requirements-api.txt
 
 # Copy and run model download script
 COPY utils/download_models.py /tmp/download_models.py

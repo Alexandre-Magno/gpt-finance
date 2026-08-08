@@ -127,6 +127,24 @@ uv pip compile requirements.in -o requirements.txt
 uv pip install -r requirements.txt
 ```
 
+#### Dependency split
+
+| File | Scope | Used by |
+|------|-------|---------|
+| `requirements.in` / `.txt` | everything, including `torch`, `sec-api`, `hdbscan` | ingestion scripts, run on the host |
+| `requirements-api.in` / `.txt` | only what `app/` imports | the backend container |
+
+The API serves embeddings through `fastembed` (ONNX runtime), never `torch` — keeping the container on the smaller set cuts roughly 2.5GB off the image. The backend `Dockerfile` installs with [uv](https://github.com/astral-sh/uv) and a BuildKit cache mount, so rebuilds reuse the wheel cache.
+
+To regenerate the API pin set (constrained to the versions already in `requirements.txt`, so it never drifts to an untested release):
+```bash
+uv pip compile requirements-api.in -c requirements.txt \
+  --python-version 3.13 --python-platform x86_64-manylinux_2_28 \
+  -o requirements-api.txt
+```
+
+Note: because the container doesn't carry `torch`, `docker-compose exec backend python ingestion/ingestion-sec-api.py` will fail on import. Run the ingestion scripts on the host.
+
 ### Configuration
 1. Copy the example environment file and configure your settings:
 ```bash

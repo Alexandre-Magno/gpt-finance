@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # LLM Configuration
     llm_api_key: Optional[str] = None
     llm_model: str = "llama-3.3-70b-versatile"
+    # Tentados em ordem quando o primario nao atende. O limite de tokens da
+    # Groq e por modelo e por dia, entao o fallback tem cota propria; tambem
+    # cobre o caso de um modelo ser descomissionado.
+    llm_fallback_models: str = "llama-3.1-8b-instant,openai/gpt-oss-20b"
     llm_temperature: float = 0.0
     llm_max_output_tokens: int = 4096
 
@@ -47,3 +51,15 @@ class Settings(BaseSettings):
     ticker_mappings_path: str = "app/config/ticker_mappings.yaml"
 
     model_config = {"env_file": ".env", "extra": "allow"}
+
+    @property
+    def llm_model_chain(self) -> List[str]:
+        """Modelos em ordem de preferencia: o primario seguido dos fallbacks."""
+        chain = [self.llm_model] + [
+            model.strip()
+            for model in self.llm_fallback_models.split(",")
+            if model.strip()
+        ]
+        # dedup preservando a ordem, para o primario nao ser tentado duas vezes
+        seen = set()
+        return [m for m in chain if not (m in seen or seen.add(m))]

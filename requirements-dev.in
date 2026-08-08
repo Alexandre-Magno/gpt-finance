@@ -1,0 +1,4 @@
+# Dependencias so de teste. Nao entram na imagem: o Dockerfile instala
+# requirements-api.txt.
+pytest
+pytest-asyncio

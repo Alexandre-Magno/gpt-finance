@@ -3,6 +3,7 @@ from groq import AsyncGroq  # Changed to async for consistency
 from app.models.embeddings import Document
 from app.config.settings import Settings
 from app.services.prompt_manager import PromptManager
+from app.utils.llm_fallback import call_with_model_fallback
 from pathlib import Path
 import logging
 import json
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 class LLMService:
     def __init__(self, settings: Settings):
         self.client = AsyncGroq(api_key=settings.llm_api_key)  # Changed to AsyncGroq
-        self.default_model = settings.llm_model
+        self.default_models = settings.llm_model_chain
         self.default_temperature = settings.llm_temperature
         self.default_max_output_tokens = settings.llm_max_output_tokens
 
@@ -29,7 +30,7 @@ class LLMService:
         temperature: float = None,
         max_output_tokens: int = None,
     ) -> str:
-        model = model or self.default_model
+        models = [model] if model else self.default_models
         temperature = (
             temperature if temperature is not None else self.default_temperature
         )
@@ -42,11 +43,15 @@ class LLMService:
         system_prompt = system_prompt_template.format(context=context, query=query)
 
         try:
-            completion = await self.client.chat.completions.create(  # Added await
-                model=model,
-                messages=[{"role": "system", "content": system_prompt}],
-                temperature=temperature,
-                max_tokens=max_output_tokens,
+            completion = await call_with_model_fallback(
+                models,
+                lambda chosen: self.client.chat.completions.create(
+                    model=chosen,
+                    messages=[{"role": "system", "content": system_prompt}],
+                    temperature=temperature,
+                    max_tokens=max_output_tokens,
+                ),
+                operation="LLM response",
             )
 
             return completion.choices[0].message.content
@@ -68,7 +73,7 @@ class LLMService:
         temperature: float = None,
         max_output_tokens: int = None,
     ) -> AsyncGenerator[str, None]:
-        model = model or self.default_model
+        models = [model] if model else self.default_models
         temperature = (
             temperature if temperature is not None else self.default_temperature
         )
@@ -82,12 +87,16 @@ class LLMService:
 
         try:
             # Create streaming response
-            stream = await self.client.chat.completions.create(  # Added await
-                model=model,
-                messages=[{"role": "system", "content": system_prompt}],
-                temperature=temperature,
-                max_tokens=max_output_tokens,
-                stream=True,  # Enable streaming
+            stream = await call_with_model_fallback(
+                models,
+                lambda chosen: self.client.chat.completions.create(
+                    model=chosen,
+                    messages=[{"role": "system", "content": system_prompt}],
+                    temperature=temperature,
+                    max_tokens=max_output_tokens,
+                    stream=True,  # Enable streaming
+                ),
+                operation="LLM stream",
             )
 
             # Process stream events

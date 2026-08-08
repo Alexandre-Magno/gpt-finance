@@ -1,8 +1,9 @@
-from typing import Optional
+from typing import List, Optional
 from groq import AsyncGroq
 import instructor
 from pydantic import BaseModel
 from app.utils.decorators import handle_errors
+from app.utils.llm_fallback import call_with_model_fallback
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ class TickerExtractor:
     def __init__(
         self,
         llm_api_key: str,
-        model: str,
+        models: List[str],
         prompt_manager,
         config_loader,
         temperature: float = 0.0,
@@ -30,7 +31,7 @@ class TickerExtractor:
         # Initialize client and patch with Instructor
         base_client = AsyncGroq(api_key=llm_api_key)
         self.client = instructor.from_groq(base_client)
-        self.model = model
+        self.models = models
         self.prompt_manager = prompt_manager
         self.config_loader = config_loader
         self.temperature = temperature
@@ -70,15 +71,19 @@ class TickerExtractor:
         extraction_prompt = self.prompt_manager.get_prompt("ticker_extraction")
 
         # Use Instructor for structured extraction
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            messages=[
-                {"role": "system", "content": extraction_prompt},
-                {"role": "user", "content": f"Extract ticker from: {message}"},
-            ],
-            response_model=TickerResponse,  # Instructor handles validation
+        response = await call_with_model_fallback(
+            self.models,
+            lambda model: self.client.chat.completions.create(
+                model=model,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                messages=[
+                    {"role": "system", "content": extraction_prompt},
+                    {"role": "user", "content": f"Extract ticker from: {message}"},
+                ],
+                response_model=TickerResponse,  # Instructor handles validation
+            ),
+            operation="Ticker extraction",
         )
 
         # Validate ticker

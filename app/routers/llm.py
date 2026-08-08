@@ -68,7 +68,7 @@ async def generate_llm_response(
 
     except Exception as e:
         logger.error(
-            "LLM generation failed", extra={"error": str(e), "query": request.query}
+            "LLM generation failed: %s", e, extra={"query": request.query}
         )
         raise HTTPException(status_code=500, detail=f"LLM generation failed: {str(e)}")
 
@@ -115,8 +115,9 @@ async def generate_llm_stream_response(  # Renamed function
 
             except Exception as e:
                 logger.error(
-                    "Stream generation failed",
-                    extra={"error": str(e), "query": request.query},
+                    "Stream generation failed: %s",
+                    e,
+                    extra={"query": request.query},
                 )
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
@@ -132,8 +133,9 @@ async def generate_llm_stream_response(  # Renamed function
 
     except Exception as e:
         logger.error(
-            "LLM stream generation failed",
-            extra={"error": str(e), "query": request.query},
+            "LLM stream generation failed: %s",
+            e,
+            extra={"query": request.query},
         )
         raise HTTPException(
             status_code=500, detail=f"LLM stream generation failed: {str(e)}"

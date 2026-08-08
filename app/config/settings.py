@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # LLM Configuration
     llm_api_key: Optional[str] = None
-    llm_model: str = "llama3-8b-8192"
+    llm_model: str = "llama-3.3-70b-versatile"
     llm_temperature: float = 0.0
     llm_max_output_tokens: int = 4096
 

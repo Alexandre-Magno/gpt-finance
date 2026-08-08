@@ -56,8 +56,9 @@ export function StreamingChat() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          // sem `model`: o backend usa LLM_MODEL, senao o modelo fica preso a
+          // um id que a Groq pode descomissionar (foi o caso do llama3-8b-8192)
           query: query,
-          model: 'llama3-8b-8192',
           temperature: 0.0,
           max_output_tokens: 4096,
           limit: 5,

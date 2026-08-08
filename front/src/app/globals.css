@@ -54,26 +54,6 @@
   }
 }
 
-/* Markdown answers follow the theme tokens instead of a fixed light/invert pair. */
-.prose {
-  --tw-prose-body: rgb(var(--foreground) / 0.9);
-  --tw-prose-headings: rgb(var(--foreground));
-  --tw-prose-lead: rgb(var(--muted-foreground));
-  --tw-prose-links: rgb(var(--primary));
-  --tw-prose-bold: rgb(var(--foreground));
-  --tw-prose-counters: rgb(var(--muted-foreground));
-  --tw-prose-bullets: rgb(var(--muted-foreground) / 0.5);
-  --tw-prose-hr: rgb(var(--border));
-  --tw-prose-quotes: rgb(var(--foreground));
-  --tw-prose-quote-borders: rgb(var(--border));
-  --tw-prose-captions: rgb(var(--muted-foreground));
-  --tw-prose-code: rgb(var(--foreground));
-  --tw-prose-pre-code: rgb(var(--foreground));
-  --tw-prose-pre-bg: rgb(var(--muted));
-  --tw-prose-th-borders: rgb(var(--border));
-  --tw-prose-td-borders: rgb(var(--border));
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

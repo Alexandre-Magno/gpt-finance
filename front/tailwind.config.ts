@@ -34,16 +34,11 @@ export default {
           from: { opacity: "0", transform: "translateY(6px)" },
           to: { opacity: "1", transform: "none" },
         },
-        blink: {
-          "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0" },
-        },
       },
       animation: {
         enter: "enter 240ms cubic-bezier(0.16, 1, 0.3, 1) both",
-        blink: "blink 1s step-end infinite",
       },
     },
   },
-  plugins: [require("@tailwindcss/typography")],
+  plugins: [],
 } satisfies Config;

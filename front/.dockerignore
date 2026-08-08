@@ -1,3 +1,16 @@
+.git
+.gitignore
+
+# segredos
+.env
+.env.*
+
 node_modules
 .next
-.git
+out
+build
+
+Dockerfile
+README.md
+.DS_Store
+npm-debug.log*

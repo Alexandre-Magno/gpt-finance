@@ -51,6 +51,11 @@ jobs:
       - name: Syntax-check backend
         run: python -m compileall -q app utils ingestion
 
+      - name: Run backend tests
+        run: |
+          pip install -q -r requirements-api.txt -r requirements-dev.in
+          pytest -q
+
   # ── Job 2: Build & push das imagens para o GHCR ──────────────────────────────
   build-push:
     needs: checks

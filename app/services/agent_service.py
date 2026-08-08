@@ -13,6 +13,7 @@ from app.services.ticker_extractor import TickerExtractor
 from app.services.document_retriever import DocumentRetriever
 from app.services.prompt_manager import PromptManager
 from app.services.config_loader import ConfigLoader
+from app.utils.llm_fallback import call_with_model_fallback
 
 from app.analyzers import (
     FundamentalAnalyzer,
@@ -43,7 +44,7 @@ class AgentService:
         # Initialize LLM client and patch with Instructor
         base_client = AsyncGroq(api_key=settings.llm_api_key)
         self.client = instructor.from_groq(base_client)
-        self.model = settings.llm_model
+        self.models = settings.llm_model_chain
 
         # Initialize services
         prompts_dir = Path(__file__).parent.parent / "prompts"
@@ -57,7 +58,7 @@ class AgentService:
 
         self.ticker_extractor = TickerExtractor(
             llm_api_key=settings.llm_api_key,
-            model=self.model,
+            models=self.models,
             prompt_manager=self.prompt_manager,
             config_loader=self.config_loader,
             temperature=settings.ticker_extraction_temperature,
@@ -72,7 +73,7 @@ class AgentService:
             document_retriever=self.document_retriever,
             prompt_manager=self.prompt_manager,
             config_loader=self.config_loader,
-            model=self.model,
+            models=self.models,
             temperature=settings.analysis_temperature,
             document_limit=settings.document_search_limit,
         )
@@ -82,7 +83,7 @@ class AgentService:
             document_retriever=self.document_retriever,
             prompt_manager=self.prompt_manager,
             config_loader=self.config_loader,
-            model=self.model,
+            models=self.models,
             temperature=settings.analysis_temperature,
             document_limit=settings.document_search_limit,
         )
@@ -92,7 +93,7 @@ class AgentService:
             document_retriever=self.document_retriever,
             prompt_manager=self.prompt_manager,
             config_loader=self.config_loader,
-            model=self.model,
+            models=self.models,
             temperature=settings.analysis_temperature,
             document_limit=settings.news_search_limit,
         )
@@ -167,12 +168,16 @@ class AgentService:
         system_prompt = self.prompt_manager.get_prompt("final_recommendation")
 
         # Use Instructor for clean structured output - no manual JSON prompts needed!
-        return await self.client.chat.completions.create(
-            model=self.model,
-            temperature=0,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": aggregation_input},
-            ],
-            response_model=FinalRecommendation,  # Instructor handles everything!
+        return await call_with_model_fallback(
+            self.models,
+            lambda model: self.client.chat.completions.create(
+                model=model,
+                temperature=0,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": aggregation_input},
+                ],
+                response_model=FinalRecommendation,  # Instructor handles everything!
+            ),
+            operation="Final recommendation",
         )

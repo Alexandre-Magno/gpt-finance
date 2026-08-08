@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Type, Optional
+from typing import TypeVar, Generic, List, Type, Optional
 from groq import AsyncGroq
 from app.services.document_retriever import DocumentRetriever
 from app.services.prompt_manager import PromptManager
 from app.utils.decorators import handle_errors
+from app.utils.llm_fallback import call_with_model_fallback
 import instructor
 import logging
 
@@ -21,7 +22,7 @@ class BaseAnalyzer(ABC, Generic[T]):
         document_retriever: DocumentRetriever,
         prompt_manager: PromptManager,
         config_loader,
-        model: str,
+        models: List[str],
         temperature: float = 0.0,
         document_limit: int = 5,
     ):
@@ -30,7 +31,7 @@ class BaseAnalyzer(ABC, Generic[T]):
         self.document_retriever = document_retriever
         self.prompt_manager = prompt_manager
         self.config_loader = config_loader
-        self.model = model
+        self.models = models
         self.temperature = temperature
         self.document_limit = document_limit
 
@@ -55,14 +56,18 @@ class BaseAnalyzer(ABC, Generic[T]):
             temperature = self.temperature
 
         # Use Instructor for clean structured output - no manual JSON prompts needed!
-        return await self.client.chat.completions.create(
-            model=self.model,
-            temperature=temperature,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-            response_model=response_model,  # Instructor handles everything!
+        return await call_with_model_fallback(
+            self.models,
+            lambda model: self.client.chat.completions.create(
+                model=model,
+                temperature=temperature,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
+                response_model=response_model,  # Instructor handles everything!
+            ),
+            operation=f"{type(self).__name__} structured call",
         )
 
     async def _analyze_section(

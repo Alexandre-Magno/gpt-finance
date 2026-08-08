@@ -13,31 +13,49 @@ Internet → nginx (host, 443, TLS Let's Encrypt)
 O backend e o Qdrant não são expostos publicamente. O Qdrant publica
 `127.0.0.1:6333` apenas porque a ingestão roda no host (veja abaixo).
 
-## Por que o deploy é pull-based
+## Como o deploy acontece
 
-A porta 22 da VM só aceita conexão do IP do dono, então um runner do GitHub não
-consegue fazer SSH para lá — a abordagem usual (`appleboy/ssh-action`) resulta
-em timeout. O fluxo é invertido:
+`.github/workflows/deploy.yml` roda em push na `main` (e por `workflow_dispatch`):
 
-1. **GitHub Actions** (`.github/workflows/ci.yml`) roda lint/type-check/sintaxe,
-   builda `backend` e `frontend` e publica em `ghcr.io/alexandre-magno/gpt-finance-*`
-   com as tags `latest` e `sha-<commit>`.
-2. **A VM** roda `scripts/deploy.sh` a cada 2 minutos por um timer systemd. O
-   script autentica no GitHub com uma **deploy key read-only**, compara o SHA da
-   `main` com o último deployado (`.deploy-tag`) e, se mudou, sobe a imagem
-   `sha-<commit>` correspondente.
+1. **checks** — lint e type-check do frontend, testes e checagem de sintaxe do
+   backend. Roda também em pull request.
+2. **build-push** — builda `backend` e `frontend` e publica em
+   `ghcr.io/alexandre-magno/gpt-finance-*` com as tags `latest` e `sha-<commit>`.
+3. **deploy** — entra na VM por SSH, faz `git reset --hard` na `main`, sobe as
+   imagens `sha-<commit>` recém-publicadas e espera os dois serviços ficarem
+   saudáveis. Se o health check falhar, reverte para o commit e a tag de imagem
+   anteriores, registrados em `.deploy-tag`.
 
-Toda conexão parte da VM para fora. Nenhuma porta é aberta para isso.
+Secrets usados: `VM_HOST`, `VM_USERNAME`, `VM_SSH_KEY`. O login no GHCR usa o
+`GITHUB_TOKEN` efêmero do próprio job, então nenhuma credencial de longa
+duração fica guardada na VM.
 
-Se as imagens ainda não estiverem publicadas quando o timer disparar, o script
-sai em silêncio e tenta no ciclo seguinte, em vez de derrubar o que está no ar.
-Se o health check falhar depois de subir, ele reverte para o commit e a tag de
-imagem anteriores.
+### Deploy pull-based (alternativa, hoje desligada)
 
-## Instalação na VM
+`scripts/deploy.sh` faz o mesmo deploy a partir da VM: autentica no GitHub com
+uma **deploy key read-only**, compara o SHA da `main` com `.deploy-tag` e sobe a
+imagem correspondente. Toda conexão parte da VM para fora, então funciona mesmo
+com a porta 22 fechada para o mundo — foi assim que o projeto rodou enquanto o
+firewall bloqueava SSH de entrada.
+
+Os dois caminhos compartilham o mesmo `.deploy-tag`, então dá para alternar sem
+perder o rastro do que está no ar. **Não deixe os dois ativos ao mesmo tempo**:
+eles competiriam pelo mesmo working tree.
 
 ```bash
-# 1. deploy key read-only, com alias SSH proprio para nao afetar outros repos
+# ligar o modo pull-based
+systemctl enable --now gptfin-deploy.timer
+
+# desligar (estado atual: o deploy vem do Actions)
+systemctl disable --now gptfin-deploy.timer
+
+# rodar um deploy manual a qualquer momento
+/usr/local/bin/gptfin-deploy
+```
+
+Instalação do modo pull-based, se precisar reativá-lo numa VM nova:
+
+```bash
 ssh-keygen -t ed25519 -f ~/.ssh/gptfin_deploy_key -N "" -C "gptfin-deploy"
 gh repo deploy-key add ~/.ssh/gptfin_deploy_key.pub --title "gptfin VM (read-only)"
 
@@ -50,11 +68,9 @@ Host github-gptfin
 EOF
 chmod 600 ~/.ssh/config
 
-# 2. script e timer
 install -m 755 scripts/deploy.sh /usr/local/bin/gptfin-deploy
 cp scripts/systemd/gptfin-deploy.{service,timer} /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now gptfin-deploy.timer
 ```
 
 O `.env` de produção fica em `/root/gpt-finance/.env` (fora do git) e é lido
@@ -63,10 +79,10 @@ pelo `env_file` do `docker-compose.prod.yml`.
 ## Operação
 
 ```bash
-systemctl list-timers gptfin-deploy.timer   # proximo disparo
-journalctl -u gptfin-deploy.service -n 50   # log do ultimo deploy
-systemctl start gptfin-deploy.service       # forcar deploy agora
+gh run list --branch main --limit 5          # historico de deploys
+gh run watch                                 # acompanhar o deploy em curso
 docker compose -f docker-compose.prod.yml ps
+journalctl -u gptfin-deploy.service -n 50    # log do modo pull-based
 ```
 
 Para fixar uma versão manualmente (ex.: rollback fora do automático):
@@ -120,10 +136,9 @@ curl -s -X POST http://127.0.0.1:6333/collections/documents/points/count \
   -d '{"filter":{"must":[{"key":"metadata.formType","match":{"value":"10-K"}}]},"exact":true}'
 ```
 
-> O timer de deploy faz `git reset --hard` em `/root/gpt-finance`. Se for
-> trabalhar no repo direto na VM, pare o timer antes
-> (`systemctl stop gptfin-deploy.timer`) para não perder alterações não
-> commitadas.
+> O deploy faz `git reset --hard` em `/root/gpt-finance`. Se for trabalhar no
+> repo direto na VM, commite antes de dar push na `main` — o deploy seguinte
+> descarta o que estiver solto no working tree.
 
 ## Modelo do LLM
 

@@ -11,6 +11,11 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# rewrites() e avaliado durante o `next build` e serializado em
+# .next/routes-manifest.json -- o servidor nao o reavalia no start. Por isso
+# BACKEND_URL tem que estar presente aqui, e nao apenas em runtime.
+ARG BACKEND_URL=http://backend:8000
+ENV BACKEND_URL=$BACKEND_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules

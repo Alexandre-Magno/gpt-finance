@@ -1,6 +1,6 @@
 import { LineChart } from 'lucide-react';
 import { Container } from '@/components/container';
-import { StreamingChat } from '@/components/streaming-chat';
+import { TickerAnalysis } from '@/components/ticker-analysis';
 
 export default function Home() {
   return (
@@ -26,14 +26,14 @@ export default function Home() {
       <main id="main" className="flex-1 py-10 sm:py-14">
         <Container>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Equity research, on demand
+            Three-stream equity analysis
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Answers grounded in filings and news, or a full three-stream analysis of any ticker.
+            Filings, quarterly momentum and market sentiment, weighed into one recommendation.
           </p>
 
           <div className="mt-8">
-            <StreamingChat />
+            <TickerAnalysis />
           </div>
         </Container>
       </main>

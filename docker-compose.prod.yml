@@ -11,12 +11,15 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.14.1
     restart: unless-stopped
+    ports:
+      # Preso ao loopback: o Qdrant sobe sem API key, entao nao pode ficar
+      # exposto. A porta existe porque a ingestao roda no host (a imagem da
+      # API nao carrega torch/sec-api) e precisa alcancar o Qdrant.
+      - "127.0.0.1:6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
     networks:
       - app-network
-    # Sem `ports`: o Qdrant sobe sem API key e a VM nao tem firewall ativo,
-    # entao ele so pode ser alcancado de dentro da rede do compose.
 
   # Cria a collection com os 3 tipos de vetor. Idempotente: se ja existe, nao faz nada.
   init-collection:
@@ -60,9 +63,9 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3010:3000"
-    environment:
-      # destino dos rewrites de /api/* feitos server-side pelo Next
-      - BACKEND_URL=http://backend:8000
+    # O destino dos rewrites de /api/* nao e configuravel em runtime: o Next
+    # resolve rewrites() no `next build`. O valor vem do ARG BACKEND_URL em
+    # front/Dockerfile, passado como build-arg no workflow.
     depends_on:
       backend:
         condition: service_healthy

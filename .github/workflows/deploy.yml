@@ -1,4 +1,4 @@
-name: CI & publish images
+name: CI/CD
 
 on:
   push:
@@ -102,9 +102,85 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.component }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
 
-  # ── Deploy ───────────────────────────────────────────────────────────────────
-  # Nao ha job de deploy aqui: a porta 22 da VM so aceita conexao do IP do dono,
-  # entao um runner do GitHub nunca consegue fazer SSH para la. O deploy e
-  # pull-based -- a VM roda scripts/deploy.sh por um timer systemd
-  # (gptfin-deploy.timer), autentica no GitHub com uma deploy key read-only e
-  # sobe a imagem :sha-<commit> que este workflow acabou de publicar.
+  # ── Job 3: Deploy na VM ──────────────────────────────────────────────────────
+  deploy:
+    needs: build-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          IMAGE_TAG: sha-${{ github.sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          envs: IMAGE_TAG,GHCR_USER,GHCR_TOKEN
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+
+            APP_DIR=/root/gpt-finance
+            COMPOSE="docker compose -f docker-compose.prod.yml"
+            cd "$APP_DIR"
+
+            if [ ! -f .env ]; then
+              echo "ERRO: $APP_DIR/.env nao existe. Crie a partir de .env-example."
+              exit 1
+            fi
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            # commit em producao hoje, para rollback
+            PREV_SHA=$(cat .deploy-tag 2>/dev/null || echo "")
+            echo "anterior: ${PREV_SHA:-<nenhum>} | novo: ${{ github.sha }}"
+
+            git fetch origin main
+            git checkout -q main
+            git reset -q --hard origin/main
+
+            export IMAGE_TAG
+            $COMPOSE pull
+            $COMPOSE up -d --remove-orphans
+
+            # o backend carrega tres modelos de embedding no start
+            echo "aguardando backend e frontend..."
+            HEALTHY=false
+            for i in $(seq 1 60); do
+              if curl -sf http://127.0.0.1:8010/health > /dev/null 2>&1 \
+                 && curl -sf http://127.0.0.1:3010/ > /dev/null 2>&1; then
+                HEALTHY=true
+                echo "stack saudavel apos $((i * 5))s"
+                break
+              fi
+              sleep 5
+            done
+
+            if [ "$HEALTHY" = false ]; then
+              echo "ERRO: health check falhou apos o deploy"
+              $COMPOSE ps
+              $COMPOSE logs --tail=100
+              if [ -n "$PREV_SHA" ]; then
+                echo "revertendo para $PREV_SHA..."
+                git reset -q --hard "$PREV_SHA"
+                IMAGE_TAG="sha-$PREV_SHA" $COMPOSE up -d
+                echo "rollback concluido"
+              else
+                echo "sem versao anterior registrada - nada para reverter"
+              fi
+              docker logout ghcr.io || true
+              exit 1
+            fi
+
+            # mesmo arquivo de estado que scripts/deploy.sh usa, para o deploy
+            # manual continuar sabendo o que esta no ar
+            echo "${{ github.sha }}" > .deploy-tag
+            docker image prune -f
+            docker logout ghcr.io
+            echo "deploy concluido: ${{ github.sha }}"

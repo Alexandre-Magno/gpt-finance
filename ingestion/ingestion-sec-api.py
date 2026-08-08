@@ -1,4 +1,5 @@
 import os
+import sys
 import html
 import uuid
 from tqdm.auto import tqdm
@@ -388,14 +389,42 @@ def process_and_ingest_filing(
         return False
 
 
-# Configuration
-ticker = "AAPL"
-form_type = "10-Q"
-section = "part2item1a"  # Risk Factors
+def main():
+    import argparse
 
-config = ProcessingConfig()
+    parser = argparse.ArgumentParser(
+        description="Ingere uma secao de um filing da SEC no Qdrant.",
+        epilog=(
+            "Secoes usuais -- 10-K: 1 (Business), 1A (Risk Factors), "
+            "7 (MD&A), 8 (Financial Statements); "
+            "10-Q: part1item1 (Financial), part1item2 (MD&A), "
+            "part2item1a (Risk Factors)."
+        ),
+    )
+    parser.add_argument("--ticker", default="AAPL")
+    parser.add_argument("--form-type", default="10-Q", choices=["10-K", "10-Q"])
+    parser.add_argument(
+        "--section",
+        default="part2item1a",
+        help="secao do filing, no formato aceito pelo ExtractorApi",
+    )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=MAX_TOKENS,
+        help=f"tamanho maximo do chunk em tokens (default {MAX_TOKENS})",
+    )
+    args = parser.parse_args()
 
-# Run the pipeline
-process_and_ingest_filing(
-    ticker=ticker, form_type=form_type, section=section, config=config
-)
+    config = ProcessingConfig(max_tokens=args.max_tokens)
+    ok = process_and_ingest_filing(
+        ticker=args.ticker,
+        form_type=args.form_type,
+        section=args.section,
+        config=config,
+    )
+    sys.exit(0 if ok else 1)
+
+
+if __name__ == "__main__":
+    main()

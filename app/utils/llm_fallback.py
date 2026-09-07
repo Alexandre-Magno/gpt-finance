@@ -21,11 +21,15 @@ T = TypeVar("T")
 
 # Codigos que significam "este modelo nao vai atender", e nao "a request esta
 # errada". So estes justificam tentar o proximo modelo.
+# tool_use_failed (400, "Tool choice is required, but model did not call a
+# tool") entra aqui: e o modelo que nao seguiu o tool call do Instructor,
+# nao a request -- outro modelo tem chance real de acertar.
 _MODEL_LEVEL_CODES = frozenset(
     {
         "model_decommissioned",
         "model_not_found",
         "rate_limit_exceeded",
+        "tool_use_failed",
     }
 )
 

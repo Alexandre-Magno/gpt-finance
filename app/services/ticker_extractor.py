@@ -1,4 +1,5 @@
 from typing import List, Optional
+import re
 from groq import AsyncGroq
 import instructor
 from pydantic import BaseModel
@@ -26,7 +27,7 @@ class TickerExtractor:
         prompt_manager,
         config_loader,
         temperature: float = 0.0,
-        max_tokens: int = 50,  # Increased for reasoning
+        max_tokens: int = 150,  # Precisa caber o tool call {"ticker", "reasoning"}
         max_retries: int = 1,
     ):
         # Initialize client and patch with Instructor
@@ -47,8 +48,18 @@ class TickerExtractor:
         if ticker:
             return ticker
 
-        # Second try: LLM extraction with Instructor (slower but comprehensive)
-        return await self._try_llm_extraction(message)
+        # Second try: LLM extraction with Instructor (slower but comprehensive).
+        # Uma falha do LLM (ex.: 400 tool_use_failed) nao pode virar 500: tenta
+        # um regex barato ($AAPL) e devolve None para o chamador responder 400
+        # ("Could not determine ticker") em vez de 500.
+        try:
+            return await self._try_llm_extraction(message)
+        except Exception as exc:
+            logger.warning(f"LLM ticker extraction failed, trying regex: {exc}")
+            ticker = self._try_regex_fallback(message)
+            if ticker:
+                return ticker
+            return None
 
     def _try_direct_mapping(self, message: str) -> Optional[str]:
         """Try to find ticker using direct company name mapping from config"""
@@ -64,7 +75,15 @@ class TickerExtractor:
 
         return None
 
-    @handle_errors("LLM ticker extraction")
+    def _try_regex_fallback(self, message: str) -> Optional[str]:
+        """Last resort: $TICKER mention (ex.: $AAPL). Sem adivinhacao."""
+        match = re.search(r"\$([A-Za-z]{1,6})\b", message)
+        if match:
+            ticker = match.group(1).upper()
+            logger.info(f"Regex fallback found ticker: {ticker}")
+            return ticker
+        return None
+
     async def _try_llm_extraction(self, message: str) -> Optional[str]:
         """Use LLM with Instructor to extract ticker from message"""
         logger.info("Using LLM to extract ticker from message")

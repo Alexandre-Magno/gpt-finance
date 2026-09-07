@@ -48,7 +48,10 @@ class Settings(BaseSettings):
 
     # Ticker extraction settings
     ticker_extraction_temperature: float = 0.0
-    ticker_extraction_max_tokens: int = 5
+    # Precisa caber o tool call do Instructor ({"ticker": ..., "reasoning": ...}).
+    # Com 5 tokens a geracao era truncada e a Groq devolvia 400 tool_use_failed,
+    # que virava 500 na API. 150 cobre o JSON com folga e continua barato.
+    ticker_extraction_max_tokens: int = 150
 
     # Config file paths
     queries_config_path: str = "app/config/queries.yaml"
